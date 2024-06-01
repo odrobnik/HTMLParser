@@ -2,7 +2,10 @@ import Foundation
 import libxml2
 import CHTMLParser
 
-public class HTMLParser: NSObject {
+// https://opensource.apple.com/source/libxml2/libxml2-21/libxml2/doc/html/libxml-HTMLparser.html
+
+public class HTMLParser: NSObject 
+{
 	@objc public weak var delegate: HTMLParserDelegate?
 
 	private var data: Data
@@ -162,15 +165,16 @@ public class HTMLParser: NSObject {
 	}
 
 	// Function to handle the formatted error message
-	@objc func handleError(_ message: UnsafePointer<CChar>) {
-		let errorMessage = String(cString: message)
+	@objc func handleError(_ errorMessage: String)
+	{
 		let error = NSError(domain: "HTMLParser", code: 1, userInfo: [NSLocalizedDescriptionKey: errorMessage])
 		self.parserError = error
 		delegate?.parser?(self, parseErrorOccurred: error)
 	}
 
 	@discardableResult
-	public func parse() -> Bool {
+	public func parse() -> Bool 
+	{
 		configureHandlers() // Ensure handlers are set up just before parsing
 
 		let dataBytes = (data as NSData).bytes
@@ -184,15 +188,16 @@ public class HTMLParser: NSObject {
 
 		parserContext = htmlCreatePushParserCtxt(&handler, Unmanaged.passUnretained(self).toOpaque(), dataBytes, Int32(dataSize), nil, charEnc)
 
-		let options: Int32 = Int32(HTML_PARSE_RECOVER.rawValue) | Int32(HTML_PARSE_NONET.rawValue) | Int32(HTML_PARSE_COMPACT.rawValue) | Int32(HTML_PARSE_NOBLANKS.rawValue)
-		htmlCtxtUseOptions(parserContext, options)
+		let options: HTMLParserOptions = [.recover, .noNet, .compact, .noBlanks]
+		htmlCtxtUseOptions(parserContext, options.rawValue)
 
 		let result = htmlParseDocument(parserContext)
 
 		return result == 0 && !isAborting
 	}
 
-	public func abortParsing() {
+	public func abortParsing() 
+	{
 		if parserContext != nil {
 			xmlStopParser(parserContext)
 			parserContext = nil
@@ -220,5 +225,7 @@ public class HTMLParser: NSObject {
 func swift_error_handler(_ ctx: UnsafeMutableRawPointer?, _ msg: UnsafePointer<CChar>?) {
 	guard let context = ctx, let message = msg else { return }
 	let parser = Unmanaged<HTMLParser>.fromOpaque(context).takeUnretainedValue()
-	parser.handleError(message)
+	
+	let errorMessage = String(cString: message)
+	parser.handleError(errorMessage)
 }
