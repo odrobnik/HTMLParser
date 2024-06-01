@@ -18,7 +18,7 @@ public class HTMLParser: NSObject
 	private var parserError: Error?
 	private var isAborting = false
 
-	public init?(data: Data, encoding: String.Encoding) {
+	public init(data: Data, encoding: String.Encoding) {
 		self.data = data
 		self.encoding = encoding
 		self.handler = htmlSAXHandler()
@@ -178,6 +178,51 @@ public class HTMLParser: NSObject
 		let error = NSError(domain: "HTMLParser", code: 1, userInfo: [NSLocalizedDescriptionKey: errorMessage])
 		self.parserError = error
 		delegate?.parser?(self, parseErrorOccurred: error)
+	}
+	
+	@discardableResult
+	public func parse() -> Bool
+	{
+		let dataBytes = (data as NSData).bytes
+		let dataSize = data.count
+		
+		var charEnc: xmlCharEncoding = XML_CHAR_ENCODING_NONE
+		
+		if encoding == .utf8 {
+			charEnc = XML_CHAR_ENCODING_UTF8
+		}
+		
+		parserContext = htmlCreatePushParserCtxt(&handler, Unmanaged.passUnretained(self).toOpaque(), dataBytes, Int32(dataSize), nil, charEnc)
+		
+		let options: Int32 = Int32(HTML_PARSE_RECOVER.rawValue) | Int32(HTML_PARSE_NONET.rawValue) | Int32(HTML_PARSE_COMPACT.rawValue) | Int32(HTML_PARSE_NOBLANKS.rawValue)
+		htmlCtxtUseOptions(parserContext, options)
+		
+		let result = htmlParseDocument(parserContext)
+		
+		return result == 0 && !isAborting
+	}
+	
+	public func abortParsing() {
+		if parserContext != nil {
+			xmlStopParser(parserContext)
+			parserContext = nil
+		}
+
+		isAborting = true
+
+		handler.startDocument = nil
+		handler.endDocument = nil
+		handler.startElement = nil
+		handler.endElement = nil
+		handler.characters = nil
+		handler.comment = nil
+		handler.error = nil
+		handler.processingInstruction = nil
+
+		if let delegate = delegate, let error = parserError as? NSError
+		{
+			delegate.parser?(self, parseErrorOccurred: error)
+		}
 	}
 }
 
