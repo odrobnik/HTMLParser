@@ -4,20 +4,27 @@ import CHTMLParser
 
 // https://opensource.apple.com/source/libxml2/libxml2-21/libxml2/doc/html/libxml-HTMLparser.html
 
-public class HTMLParser: NSObject 
+
+public class HTMLParser: NSObject
 {
 	@objc public weak var delegate: HTMLParserDelegate?
 
+	// Input
+	
 	private var data: Data
 	private var encoding: String.Encoding
+	
+	// Parser State
 	
 	private var parserContext: htmlParserCtxtPtr?
 	private var handler: htmlSAXHandler
 	private var accumulateBuffer: String?
 	private var parserError: Error?
 	private var isAborting = false
-
-	public init(data: Data, encoding: String.Encoding) 
+	
+	// MARK: - Init / Deinit
+	
+	public init(data: Data, encoding: String.Encoding)
 	{
 		self.data = data
 		self.encoding = encoding
@@ -30,7 +37,80 @@ public class HTMLParser: NSObject
 			htmlFreeParserCtxt(context)
 		}
 	}
+	
+	// MARK: - Public Methods
+	
+	public var lineNumber: Int {
+		return Int(xmlSAX2GetLineNumber(parserContext))
+	}
 
+	public var columnNumber: Int {
+		return Int(xmlSAX2GetColumnNumber(parserContext))
+	}
+
+	public var systemID: String? {
+		guard let systemID = xmlSAX2GetSystemId(parserContext) else { return nil }
+		return String(cString: systemID)
+	}
+
+	public var publicID: String? {
+		guard let publicID = xmlSAX2GetPublicId(parserContext) else { return nil }
+		return String(cString: publicID)
+	}
+
+	public var error: Error? {
+		return parserError
+	}
+	
+	@discardableResult
+	public func parse() -> Bool
+	{
+		configureHandlers() // Ensure handlers are set up just before parsing
+
+		let dataBytes = (data as NSData).bytes
+		let dataSize = data.count
+
+		var charEnc: xmlCharEncoding = XML_CHAR_ENCODING_NONE
+
+		if encoding == .utf8 {
+			charEnc = XML_CHAR_ENCODING_UTF8
+		}
+
+		parserContext = htmlCreatePushParserCtxt(&handler, Unmanaged.passUnretained(self).toOpaque(), dataBytes, Int32(dataSize), nil, charEnc)
+
+		let options: HTMLParserOptions = [.recover, .noNet, .compact, .noBlanks]
+		htmlCtxtUseOptions(parserContext, options.rawValue)
+
+		let result = htmlParseDocument(parserContext)
+
+		return result == 0 && !isAborting
+	}
+
+	public func abortParsing()
+	{
+		if parserContext != nil {
+			xmlStopParser(parserContext)
+			parserContext = nil
+		}
+
+		isAborting = true
+
+		handler.startDocument = nil
+		handler.endDocument = nil
+		handler.startElement = nil
+		handler.endElement = nil
+		handler.characters = nil
+		handler.comment = nil
+		handler.error = nil
+		handler.processingInstruction = nil
+
+		if let delegate = delegate, let error = parserError as? NSError {
+			delegate.parser?(self, parseErrorOccurred: error)
+		}
+	}
+	
+	// MARK: - Helpers
+	
 	private func configureHandlers() {
 		// Set all handlers first
 		handler.startDocument = { context in
@@ -142,88 +222,24 @@ public class HTMLParser: NSObject
 		}
 	}
 
-	public var lineNumber: Int {
-		return Int(xmlSAX2GetLineNumber(parserContext))
-	}
-
-	public var columnNumber: Int {
-		return Int(xmlSAX2GetColumnNumber(parserContext))
-	}
-
-	public var systemID: String? {
-		guard let systemID = xmlSAX2GetSystemId(parserContext) else { return nil }
-		return String(cString: systemID)
-	}
-
-	public var publicID: String? {
-		guard let publicID = xmlSAX2GetPublicId(parserContext) else { return nil }
-		return String(cString: publicID)
-	}
-
-	public var error: Error? {
-		return parserError
-	}
-
 	// Function to handle the formatted error message
-	@objc func handleError(_ errorMessage: String)
+	func handleError(_ errorMessage: String)
 	{
 		let error = NSError(domain: "HTMLParser", code: 1, userInfo: [NSLocalizedDescriptionKey: errorMessage])
 		self.parserError = error
 		delegate?.parser?(self, parseErrorOccurred: error)
-	}
-
-	@discardableResult
-	public func parse() -> Bool 
-	{
-		configureHandlers() // Ensure handlers are set up just before parsing
-
-		let dataBytes = (data as NSData).bytes
-		let dataSize = data.count
-
-		var charEnc: xmlCharEncoding = XML_CHAR_ENCODING_NONE
-
-		if encoding == .utf8 {
-			charEnc = XML_CHAR_ENCODING_UTF8
-		}
-
-		parserContext = htmlCreatePushParserCtxt(&handler, Unmanaged.passUnretained(self).toOpaque(), dataBytes, Int32(dataSize), nil, charEnc)
-
-		let options: HTMLParserOptions = [.recover, .noNet, .compact, .noBlanks]
-		htmlCtxtUseOptions(parserContext, options.rawValue)
-
-		let result = htmlParseDocument(parserContext)
-
-		return result == 0 && !isAborting
-	}
-
-	public func abortParsing() 
-	{
-		if parserContext != nil {
-			xmlStopParser(parserContext)
-			parserContext = nil
-		}
-
-		isAborting = true
-
-		handler.startDocument = nil
-		handler.endDocument = nil
-		handler.startElement = nil
-		handler.endElement = nil
-		handler.characters = nil
-		handler.comment = nil
-		handler.error = nil
-		handler.processingInstruction = nil
-
-		if let delegate = delegate, let error = parserError as? NSError {
-			delegate.parser?(self, parseErrorOccurred: error)
-		}
 	}
 }
 
 // Extern declaration to be called from C code
 @_cdecl("swift_error_handler")
 func swift_error_handler(_ ctx: UnsafeMutableRawPointer?, _ msg: UnsafePointer<CChar>?) {
-	guard let context = ctx, let message = msg else { return }
+	guard let context = ctx, 
+			let message = msg else
+	{
+		return
+	}
+	
 	let parser = Unmanaged<HTMLParser>.fromOpaque(context).takeUnretainedValue()
 	
 	let errorMessage = String(cString: message)
