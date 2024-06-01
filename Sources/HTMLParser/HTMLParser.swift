@@ -2,40 +2,30 @@ import Foundation
 import libxml2
 import CHTMLParser
 
-public class HTMLParser: NSObject
-{
-	@objc public weak var delegate: HTMLParserDelegate? {
-		didSet {
-			configureHandlers()
-		}
-	}
+public class HTMLParser: NSObject {
+	@objc public weak var delegate: HTMLParserDelegate?
 
 	private var data: Data
 	private var encoding: String.Encoding
+	
 	private var parserContext: htmlParserCtxtPtr?
 	private var handler: htmlSAXHandler
 	private var accumulateBuffer: String?
 	private var parserError: Error?
 	private var isAborting = false
 
-	public init(data: Data, encoding: String.Encoding) {
+	public init(data: Data, encoding: String.Encoding) 
+	{
 		self.data = data
 		self.encoding = encoding
 		self.handler = htmlSAXHandler()
 		super.init()
-		initializeHandler()
 	}
 
 	deinit {
 		if let context = parserContext {
 			htmlFreeParserCtxt(context)
 		}
-	}
-
-	private func initializeHandler() {
-		configureHandlers()
-
-		parserContext = htmlCreatePushParserCtxt(&handler, Unmanaged.passUnretained(self).toOpaque(), nil, 0, nil, XML_CHAR_ENCODING_NONE)
 	}
 
 	private func configureHandlers() {
@@ -103,8 +93,7 @@ public class HTMLParser: NSObject
 		htmlparser_set_error_handler(&handler)
 
 		// Null out handlers if the delegate does not respond to the methods
-		if let delegate = delegate as? NSObjectProtocol
-		{
+		if let delegate = delegate as? NSObjectProtocol {
 			handler.startDocument = delegate.responds(to: #selector(HTMLParserDelegate.parserDidStartDocument(_:))) ? handler.startDocument : nil
 			handler.endDocument = delegate.responds(to: #selector(HTMLParserDelegate.parserDidEndDocument(_:))) ? handler.endDocument : nil
 			handler.characters = delegate.responds(to: #selector(HTMLParserDelegate.parser(_:foundCharacters:))) ? handler.characters : nil
@@ -179,29 +168,30 @@ public class HTMLParser: NSObject
 		self.parserError = error
 		delegate?.parser?(self, parseErrorOccurred: error)
 	}
-	
+
 	@discardableResult
-	public func parse() -> Bool
-	{
+	public func parse() -> Bool {
+		configureHandlers() // Ensure handlers are set up just before parsing
+
 		let dataBytes = (data as NSData).bytes
 		let dataSize = data.count
-		
+
 		var charEnc: xmlCharEncoding = XML_CHAR_ENCODING_NONE
-		
+
 		if encoding == .utf8 {
 			charEnc = XML_CHAR_ENCODING_UTF8
 		}
-		
+
 		parserContext = htmlCreatePushParserCtxt(&handler, Unmanaged.passUnretained(self).toOpaque(), dataBytes, Int32(dataSize), nil, charEnc)
-		
+
 		let options: Int32 = Int32(HTML_PARSE_RECOVER.rawValue) | Int32(HTML_PARSE_NONET.rawValue) | Int32(HTML_PARSE_COMPACT.rawValue) | Int32(HTML_PARSE_NOBLANKS.rawValue)
 		htmlCtxtUseOptions(parserContext, options)
-		
+
 		let result = htmlParseDocument(parserContext)
-		
+
 		return result == 0 && !isAborting
 	}
-	
+
 	public func abortParsing() {
 		if parserContext != nil {
 			xmlStopParser(parserContext)
@@ -219,8 +209,7 @@ public class HTMLParser: NSObject
 		handler.error = nil
 		handler.processingInstruction = nil
 
-		if let delegate = delegate, let error = parserError as? NSError
-		{
+		if let delegate = delegate, let error = parserError as? NSError {
 			delegate.parser?(self, parseErrorOccurred: error)
 		}
 	}
