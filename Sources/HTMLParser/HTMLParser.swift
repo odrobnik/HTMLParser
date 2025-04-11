@@ -1,6 +1,10 @@
 import Foundation
-import CLibXML2
+
 import CHTMLParser
+
+#if canImport(ClibXML2)
+import CLibXML2
+#endif
 
 // https://opensource.apple.com/source/libxml2/libxml2-21/libxml2/doc/html/libxml-HTMLparser.html
 
@@ -20,6 +24,7 @@ public class HTMLParser: NSObject
 	private var accumulateBuffer: String?
 	private var parserError: Error?
 	private var isAborting = false
+	private var currentContinuation: AsyncThrowingStream<HTMLParsingEvent, Error>.Continuation?
 	
 	// MARK: - Init / Deinit
 	
