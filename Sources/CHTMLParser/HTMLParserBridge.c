@@ -1,6 +1,5 @@
 // DTHTMLParserBridge.c
 
-#include "DTHTMLParser-Bridging-Header.h"
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>

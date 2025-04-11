@@ -1,0 +1,6 @@
+module CHTMLParser [system] {
+	header "include/HTMLParserOptions.h"
+	header "include/DTHTMLParser-Bridging-Header.h"
+	link "xml2"
+	export *
+}
