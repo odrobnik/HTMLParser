@@ -50,6 +50,7 @@ void htmlparser_error_sax_handler(void *ctx, const char *msg, ...)
 	free(formattedMsg);
 }
 
+
 /**
  Sets the error handler in the SAX handler structure.
  

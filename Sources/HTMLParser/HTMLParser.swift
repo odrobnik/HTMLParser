@@ -4,7 +4,7 @@ import CHTMLParser
 
 // https://opensource.apple.com/source/libxml2/libxml2-21/libxml2/doc/html/libxml-HTMLparser.html
 
-
+@objc(DTHTMLParser)
 public class HTMLParser: NSObject
 {
 	@objc public weak var delegate: HTMLParserDelegate?
