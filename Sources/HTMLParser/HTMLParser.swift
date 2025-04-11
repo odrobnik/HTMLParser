@@ -31,6 +31,9 @@ public final class HTMLParser
 		self.data = data
 		self.encoding = encoding
 		self.handler = htmlSAXHandler()
+		
+		// Set up the error handler
+		htmlparser_set_error_handler(&handler)
 	}
 
 	deinit {
@@ -61,28 +64,6 @@ public final class HTMLParser
 
 	public var error: Error? {
 		return parserError
-	}
-	
-	@discardableResult
-	public func parse() -> Bool
-	{
-		let dataBytes = (data as NSData).bytes
-		let dataSize = data.count
-
-		var charEnc: xmlCharEncoding = XML_CHAR_ENCODING_NONE
-
-		if encoding == .utf8 {
-			charEnc = XML_CHAR_ENCODING_UTF8
-		}
-
-		parserContext = htmlCreatePushParserCtxt(&handler, Unmanaged.passUnretained(self).toOpaque(), dataBytes, Int32(dataSize), nil, charEnc)
-
-		let options: HTMLParserOptions = [.recover, .noNet, .compact, .noBlanks]
-		htmlCtxtUseOptions(parserContext, options.rawValue)
-
-		let result = htmlParseDocument(parserContext)
-
-		return result == 0 && !isAborting
 	}
 	
 	// MARK: - AsyncThrowingStream API
@@ -142,6 +123,7 @@ public final class HTMLParser
 		}
 
 		isAborting = true
+		parserError = .aborted
 
 		handler.startDocument = nil
 		handler.endDocument = nil
@@ -154,11 +136,7 @@ public final class HTMLParser
 
 		// If we have a continuation, finish it with an error
 		if let continuation = currentContinuation {
-			if let error = parserError {
-				continuation.finish(throwing: error)
-			} else {
-				continuation.finish(throwing: HTMLParserError.aborted)
-			}
+			continuation.finish(throwing: HTMLParserError.aborted)
 			currentContinuation = nil
 		}
 	}
@@ -224,23 +202,6 @@ public final class HTMLParser
 			let targetString = String(cString: target!)
 			let dataString = String(cString: data!)
 			parser.currentContinuation?.yield(.processingInstruction(target: targetString, data: dataString))
-		}
-
-		// Set the error handler function for the specific instance
-		htmlparser_set_error_handler(&handler)
-	}
-
-	private var startElementNoDelegate: @convention(c) (UnsafeMutableRawPointer?, UnsafePointer<xmlChar>?, UnsafePointer<UnsafePointer<xmlChar>?>?) -> Void {
-		return { context, name, atts in
-			let parser = Unmanaged<HTMLParser>.fromOpaque(context!).takeUnretainedValue()
-			parser.resetAccumulateBufferAndReportCharacters()
-		}
-	}
-
-	private var endElementNoDelegate: @convention(c) (UnsafeMutableRawPointer?, UnsafePointer<xmlChar>?) -> Void {
-		return { context, name in
-			let parser = Unmanaged<HTMLParser>.fromOpaque(context!).takeUnretainedValue()
-			parser.resetAccumulateBufferAndReportCharacters()
 		}
 	}
 
