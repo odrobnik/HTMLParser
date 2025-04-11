@@ -1,4 +1,4 @@
-// swift-tools-version: 5.10
+// swift-tools-version:5.10
 import PackageDescription
 
 let package = Package(
@@ -7,25 +7,41 @@ let package = Package(
 		.library(name: "HTMLParser", targets: ["HTMLParser"]),
 	],
 	targets: [
-	  .target(
-		name: "CHTMLParser",
-		dependencies: [],
-		path: "Sources/CHTMLParser",
-		publicHeadersPath: "include",
-		cSettings: [
-		  .headerSearchPath("include")
-		],
-		linkerSettings: [
-		  .linkedLibrary("xml2")
-		]
-	  ),
-	  .target(
-		name: "HTMLParser",
-		dependencies: ["CHTMLParser"]
-	  ),
-	  .testTarget(
-		name: "HTMLParserTests",
-		dependencies: ["HTMLParser"]
-	  )
+		// System module for libxml2
+		.systemLibrary(
+			name: "CLibXML2",
+			path: "Sources/CLibXML2",
+			pkgConfig: "libxml-2.0",
+			providers: [
+				.apt(["libxml2-dev"]),
+				.yum(["libxml2-devel"])
+			]
+		),
+
+		// Your C target
+		.target(
+			name: "CHTMLParser",
+			dependencies: ["CLibXML2"],
+			path: "Sources/CHTMLParser",
+			publicHeadersPath: "include",
+			cSettings: [
+				.headerSearchPath("include")
+			],
+			linkerSettings: [
+			  .linkedLibrary("xml2")
+			]
+		),
+
+		// Your Swift interface
+		.target(
+			name: "HTMLParser",
+			dependencies: ["CHTMLParser"]
+		),
+
+		// Tests
+		.testTarget(
+			name: "HTMLParserTests",
+			dependencies: ["HTMLParser"]
+		)
 	]
 )

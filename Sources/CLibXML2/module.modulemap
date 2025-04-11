@@ -1,0 +1,5 @@
+module CLibXML2 [system] {
+    umbrella header "libxml2-wrapper.h"
+    export *
+    module * { export * }
+}
