@@ -25,7 +25,8 @@ let package = Package(
 			path: "Sources/CHTMLParser",
 			publicHeadersPath: "include",
 			cSettings: [
-				.headerSearchPath("include")
+				.headerSearchPath("include"),
+				.headerSearchPath("../CLibXML2")
 			],
 			linkerSettings: [
 			  .linkedLibrary("xml2")

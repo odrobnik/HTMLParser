@@ -3,8 +3,8 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <libxml/parser.h>
 
+#include "libxml2-wrapper.h"
 /**
  Handles SAX parser errors by formatting the error message and passing it to a Swift handler.
  
