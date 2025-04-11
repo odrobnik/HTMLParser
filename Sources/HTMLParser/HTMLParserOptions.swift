@@ -7,7 +7,7 @@
 
 import Foundation
 
-public struct HTMLParserOptions: OptionSet {
+public struct HTMLParserOptions: OptionSet, Sendable {
     public let rawValue: Int32
     public init(rawValue: Int32) { self.rawValue = rawValue }
 
