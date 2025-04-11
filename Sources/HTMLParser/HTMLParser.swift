@@ -4,10 +4,9 @@ import CHTMLParser
 
 // https://opensource.apple.com/source/libxml2/libxml2-21/libxml2/doc/html/libxml-HTMLparser.html
 
-@objc(DTHTMLParser)
 public class HTMLParser: NSObject
 {
-	@objc public weak var delegate: HTMLParserDelegate?
+	public weak var delegate: HTMLParserDelegate?
 
 	// Input
 	
@@ -105,7 +104,7 @@ public class HTMLParser: NSObject
 		handler.processingInstruction = nil
 
 		if let delegate = delegate, let error = parserError as? NSError {
-			delegate.parser?(self, parseErrorOccurred: error)
+			delegate.parser(self, parseErrorOccurred: error)
 		}
 	}
 	
@@ -115,12 +114,12 @@ public class HTMLParser: NSObject
 		// Set all handlers first
 		handler.startDocument = { context in
 			let parser = Unmanaged<HTMLParser>.fromOpaque(context!).takeUnretainedValue()
-			parser.delegate?.parserDidStartDocument?(parser)
+			parser.delegate?.parserDidStartDocument(parser)
 		}
 
 		handler.endDocument = { context in
 			let parser = Unmanaged<HTMLParser>.fromOpaque(context!).takeUnretainedValue()
-			parser.delegate?.parserDidEndDocument?(parser)
+			parser.delegate?.parserDidEndDocument(parser)
 		}
 
 		handler.startElement = { context, name, atts in
@@ -138,14 +137,14 @@ public class HTMLParser: NSObject
 				}
 				i += 1
 			}
-			parser.delegate?.parser?(parser, didStartElement: elementName, attributes: attributes)
+			parser.delegate?.parser(parser, didStartElement: elementName, attributes: attributes)
 		}
 
 		handler.endElement = { context, name in
 			let parser = Unmanaged<HTMLParser>.fromOpaque(context!).takeUnretainedValue()
 			parser.resetAccumulateBufferAndReportCharacters()
 			let elementName = String(cString: name!)
-			parser.delegate?.parser?(parser, didEndElement: elementName)
+			parser.delegate?.parser(parser, didEndElement: elementName)
 		}
 
 		handler.characters = { context, chars, len in
@@ -156,37 +155,24 @@ public class HTMLParser: NSObject
 		handler.comment = { context, chars in
 			let parser = Unmanaged<HTMLParser>.fromOpaque(context!).takeUnretainedValue()
 			let comment = String(cString: chars!)
-			parser.delegate?.parser?(parser, foundComment: comment)
+			parser.delegate?.parser(parser, foundComment: comment)
 		}
 
 		handler.cdataBlock = { context, value, len in
 			let parser = Unmanaged<HTMLParser>.fromOpaque(context!).takeUnretainedValue()
 			let data = Data(bytes: value!, count: Int(len))
-			parser.delegate?.parser?(parser, foundCDATA: data)
+			parser.delegate?.parser(parser, foundCDATA: data)
 		}
 
 		handler.processingInstruction = { context, target, data in
 			let parser = Unmanaged<HTMLParser>.fromOpaque(context!).takeUnretainedValue()
 			let targetString = String(cString: target!)
 			let dataString = String(cString: data!)
-			parser.delegate?.parser?(parser, foundProcessingInstructionWithTarget: targetString, data: dataString)
+			parser.delegate?.parser(parser, foundProcessingInstructionWithTarget: targetString, data: dataString)
 		}
 
 		// Set the error handler function for the specific instance
 		htmlparser_set_error_handler(&handler)
-
-		// Null out handlers if the delegate does not respond to the methods
-		if let delegate = delegate as? NSObjectProtocol {
-			handler.startDocument = delegate.responds(to: #selector(HTMLParserDelegate.parserDidStartDocument(_:))) ? handler.startDocument : nil
-			handler.endDocument = delegate.responds(to: #selector(HTMLParserDelegate.parserDidEndDocument(_:))) ? handler.endDocument : nil
-			handler.characters = delegate.responds(to: #selector(HTMLParserDelegate.parser(_:foundCharacters:))) ? handler.characters : nil
-			handler.startElement = delegate.responds(to: #selector(HTMLParserDelegate.parser(_:didStartElement:attributes:))) ? handler.startElement : nil
-			handler.endElement = delegate.responds(to: #selector(HTMLParserDelegate.parser(_:didEndElement:))) ? handler.endElement : (handler.characters != nil ? endElementNoDelegate : nil)
-			handler.comment = delegate.responds(to: #selector(HTMLParserDelegate.parser(_:foundComment:))) ? handler.comment : nil
-			handler.error = delegate.responds(to: #selector(HTMLParserDelegate.parser(_:parseErrorOccurred:))) ? handler.error : nil
-			handler.cdataBlock = delegate.responds(to: #selector(HTMLParserDelegate.parser(_:foundCDATA:))) ? handler.cdataBlock : nil
-			handler.processingInstruction = delegate.responds(to: #selector(HTMLParserDelegate.parser(_:foundProcessingInstructionWithTarget:data:))) ? handler.processingInstruction : nil
-		}
 	}
 
 	private var startElementNoDelegate: @convention(c) (UnsafeMutableRawPointer?, UnsafePointer<xmlChar>?, UnsafePointer<UnsafePointer<xmlChar>?>?) -> Void {
@@ -205,7 +191,7 @@ public class HTMLParser: NSObject
 
 	private func resetAccumulateBufferAndReportCharacters() {
 		if let buffer = accumulateBuffer, !buffer.isEmpty {
-			delegate?.parser?(self, foundCharacters: buffer)
+			delegate?.parser(self, foundCharacters: buffer)
 			accumulateBuffer = nil
 		}
 	}
@@ -227,7 +213,7 @@ public class HTMLParser: NSObject
 	{
 		let error = NSError(domain: "HTMLParser", code: 1, userInfo: [NSLocalizedDescriptionKey: errorMessage])
 		self.parserError = error
-		delegate?.parser?(self, parseErrorOccurred: error)
+		delegate?.parser(self, parseErrorOccurred: error)
 	}
 }
 

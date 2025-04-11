@@ -7,7 +7,6 @@ let package = Package(
 		.library(name: "HTMLParser", targets: ["HTMLParser"]),
 	],
 	targets: [
-		// System module for libxml2
 		.systemLibrary(
 			name: "CLibXML2",
 			path: "Sources/CLibXML2",
@@ -17,8 +16,6 @@ let package = Package(
 				.yum(["libxml2-devel"])
 			]
 		),
-
-		// Your C target
 		.target(
 		  name: "CHTMLParser",
 		  dependencies: ["CLibXML2"],
