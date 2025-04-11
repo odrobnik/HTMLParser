@@ -4,6 +4,8 @@ import CHTMLParser
 
 #if canImport(ClibXML2)
 import CLibXML2
+#else
+import libxml2
 #endif
 
 // https://opensource.apple.com/source/libxml2/libxml2-21/libxml2/doc/html/libxml-HTMLparser.html
@@ -14,6 +16,7 @@ public final class HTMLParser
 	
 	private var data: Data
 	private var encoding: String.Encoding
+	private var shouldRecover: Bool
 	
 	// Parser State
 	
@@ -26,10 +29,11 @@ public final class HTMLParser
 	
 	// MARK: - Init / Deinit
 	
-	public init(data: Data, encoding: String.Encoding)
+	public init(data: Data, encoding: String.Encoding, shouldRecover: Bool = true)
 	{
 		self.data = data
 		self.encoding = encoding
+		self.shouldRecover = shouldRecover
 		self.handler = htmlSAXHandler()
 		
 		// Set up the error handler
@@ -77,7 +81,6 @@ public final class HTMLParser
 			configureHandlersForStream()
 			
 			// Set up the parser
-			let dataBytes = (data as NSData).bytes
 			let dataSize = data.count
 			
 			var charEnc: xmlCharEncoding = XML_CHAR_ENCODING_NONE
@@ -85,22 +88,45 @@ public final class HTMLParser
 				charEnc = XML_CHAR_ENCODING_UTF8
 			}
 			
-			parserContext = htmlCreatePushParserCtxt(&handler, Unmanaged.passUnretained(self).toOpaque(), dataBytes, Int32(dataSize), nil, charEnc)
+			parserContext = htmlCreatePushParserCtxt(&handler, Unmanaged.passUnretained(self).toOpaque(), nil, 0, nil, charEnc)
 			
-			let options: HTMLParserOptions = [.recover, .noNet, .compact, .noBlanks]
+			var options: HTMLParserOptions = [.noNet, .noBlanks]
+			if shouldRecover {
+				options.insert(.recover)
+			}
 			htmlCtxtUseOptions(parserContext, options.rawValue)
 			
-			// Start parsing
-			let result = htmlParseDocument(parserContext)
+			// Push the data in chunks to allow for error handling
+			let chunkSize = 4096
+			var offset = 0
 			
-			// Check for errors
-			if result != 0 || isAborting {
-				if let error = parserError {
-					continuation.finish(throwing: error)
-				} else {
-					continuation.finish(throwing: HTMLParserError.parsingError(message: "Parsing failed"))
+			while offset < dataSize {
+				let remainingSize = dataSize - offset
+				let currentChunkSize = min(chunkSize, remainingSize)
+				
+				let chunk = data.subdata(in: offset..<(offset + currentChunkSize))
+				_ = htmlParseChunk(parserContext, (chunk as NSData).bytes.assumingMemoryBound(to: Int8.self), Int32(currentChunkSize), 0)
+				
+				// Only check for abort here. Errors are handled by handleError when !shouldRecover
+				if isAborting {
+					// handleError or abortParsing should have already finished the continuation
+					return
 				}
-			} else {
+				
+				offset += currentChunkSize
+			}
+			
+			// Complete the parsing
+			_ = htmlParseChunk(parserContext, nil, 0, 1)
+			
+			// Only check for abort here. Errors are handled by handleError when !shouldRecover
+			if isAborting {
+				// handleError or abortParsing should have already finished the continuation
+				return
+			}
+			
+			// If we haven't finished due to error or abort, finish normally
+			if currentContinuation != nil {
 				continuation.finish()
 			}
 			
@@ -144,7 +170,6 @@ public final class HTMLParser
 	// MARK: - Helpers
 	
 	private func configureHandlersForStream() {
-		// Set all handlers first
 		handler.startDocument = { context in
 			let parser = Unmanaged<HTMLParser>.fromOpaque(context!).takeUnretainedValue()
 			parser.currentContinuation?.yield(.startDocument)
@@ -228,12 +253,12 @@ public final class HTMLParser
 	func handleError(_ errorMessage: String)
 	{
 		let error = HTMLParserError.parsingError(message: errorMessage)
-		self.parserError = error
+		self.parserError = error // Always record the error
 		
-		// If we have a continuation, finish it with an error
-		if let continuation = currentContinuation {
+		// If we have a continuation and we're not in recovery mode, *always* finish with error
+		if let continuation = currentContinuation, !shouldRecover {
 			continuation.finish(throwing: error)
-			currentContinuation = nil
+			currentContinuation = nil // Mark as finished
 		}
 	}
 }
