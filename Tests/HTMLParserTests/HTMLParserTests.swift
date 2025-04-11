@@ -3,6 +3,7 @@ import XCTest
 
 final class HTMLParserTests: XCTestCase {
     func testExample() throws {
+
         // XCTest Documentation
         // https://developer.apple.com/documentation/xctest
 
@@ -10,3 +11,4 @@ final class HTMLParserTests: XCTestCase {
         // https://developer.apple.com/documentation/xctest/defining_test_cases_and_test_methods
     }
 }
+
