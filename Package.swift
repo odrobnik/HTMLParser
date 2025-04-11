@@ -9,8 +9,8 @@ let package = Package(
 	targets: [
 		// System module for libxml2
 		.systemLibrary(
-			name: "libxml2",
-			path: "Sources/libxml2",
+			name: "CLibXML2",
+			path: "Sources/CLibXML2",
 			pkgConfig: "libxml-2.0",
 			providers: [
 				.apt(["libxml2-dev"]),
@@ -21,12 +21,12 @@ let package = Package(
 		// Your C target
 		.target(
 			name: "CHTMLParser",
-			dependencies: ["libxml2"],
+			dependencies: ["CLibXML2"],
 			path: "Sources/CHTMLParser",
 			publicHeadersPath: "include",
 			cSettings: [
 				.headerSearchPath("include"),
-				.headerSearchPath("../libxml2")
+				.headerSearchPath("../CLibXML2")
 			],
 			linkerSettings: [
 			  .linkedLibrary("xml2")

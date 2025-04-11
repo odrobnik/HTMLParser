@@ -4,6 +4,7 @@
 #define DTHTMLParser_Bridging_Header_h
 
 #include <libxml/parser.h>
+#include <libxml/HTMLParser.h>
 
 // Function to format variadic arguments into a string and call a Swift handler
 void htmlparser_error_sax_handler(void *ctx, const char *msg, ...);

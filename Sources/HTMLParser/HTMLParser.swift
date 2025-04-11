@@ -1,5 +1,5 @@
 import Foundation
-import libxml2
+import CLibXML2
 import CHTMLParser
 
 // https://opensource.apple.com/source/libxml2/libxml2-21/libxml2/doc/html/libxml-HTMLparser.html
