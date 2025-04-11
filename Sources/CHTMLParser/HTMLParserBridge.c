@@ -4,7 +4,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "libxml2-wrapper.h"
+#include "DTHTMLParser-Bridging-Header.h"
+
 /**
  Handles SAX parser errors by formatting the error message and passing it to a Swift handler.
  

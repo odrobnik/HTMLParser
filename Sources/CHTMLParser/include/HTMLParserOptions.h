@@ -12,7 +12,7 @@
 #define HTMLParserOptions_h
 
 #import <Foundation/Foundation.h>
-#include <libxml/parser.h>
+#include "libxml2-wrapper.h"
 
 typedef NS_OPTIONS(int32_t, HTMLParserOptions) {
 	HTMLParserOptionRecover       = 1 << 0,

@@ -20,17 +20,17 @@ let package = Package(
 
 		// Your C target
 		.target(
-			name: "CHTMLParser",
-			dependencies: ["CLibXML2"],
-			path: "Sources/CHTMLParser",
-			publicHeadersPath: "include",
-			cSettings: [
-				.headerSearchPath("include"),
-				.headerSearchPath("../CLibXML2")
-			],
-			linkerSettings: [
-			  .linkedLibrary("xml2")
-			]
+		  name: "CHTMLParser",
+		  dependencies: ["CLibXML2"],
+		  path: "Sources/CHTMLParser",
+		  publicHeadersPath: "include",
+		  cSettings: [
+			.headerSearchPath("include"),
+			.headerSearchPath("../../CLibXML2")
+		  ],
+		  linkerSettings: [
+			.linkedLibrary("xml2")
+		  ]
 		),
 
 		// Your Swift interface
