@@ -8,15 +8,13 @@ import CLibXML2
 import libxml2
 #endif
 
-// https://opensource.apple.com/source/libxml2/libxml2-21/libxml2/doc/html/libxml-HTMLparser.html
-
 public final class HTMLParser
 {
 	// Input
 	
-	private var data: Data
-	private var encoding: String.Encoding
-	private var shouldRecover: Bool
+	private let data: Data
+	private let encoding: String.Encoding
+	private let options: HTMLParserOptions
 	
 	// Parser State
 	
@@ -29,11 +27,11 @@ public final class HTMLParser
 	
 	// MARK: - Init / Deinit
 	
-	public init(data: Data, encoding: String.Encoding, shouldRecover: Bool = true)
+	public init(data: Data, encoding: String.Encoding = .utf8, options: HTMLParserOptions = [.noNet, .noBlanks, .recover])
 	{
 		self.data = data
 		self.encoding = encoding
-		self.shouldRecover = shouldRecover
+		self.options = options
 		self.handler = htmlSAXHandler()
 		
 		// Set up the error handler
@@ -41,6 +39,7 @@ public final class HTMLParser
 	}
 
 	deinit {
+		
 		if let context = parserContext {
 			htmlFreeParserCtxt(context)
 		}
@@ -83,17 +82,11 @@ public final class HTMLParser
 			// Set up the parser
 			let dataSize = data.count
 			
-			var charEnc: xmlCharEncoding = XML_CHAR_ENCODING_NONE
-			if encoding == .utf8 {
-				charEnc = XML_CHAR_ENCODING_UTF8
-			}
+			// Use the extension to convert Swift encoding to libxml2 encoding
+			let charEnc = encoding.xmlCharEncoding
 			
 			parserContext = htmlCreatePushParserCtxt(&handler, Unmanaged.passUnretained(self).toOpaque(), nil, 0, nil, charEnc)
 			
-			var options: HTMLParserOptions = [.noNet, .noBlanks]
-			if shouldRecover {
-				options.insert(.recover)
-			}
 			htmlCtxtUseOptions(parserContext, options.rawValue)
 			
 			// Push the data in chunks to allow for error handling
@@ -172,18 +165,20 @@ public final class HTMLParser
 	private func configureHandlersForStream() {
 		handler.startDocument = { context in
 			let parser = Unmanaged<HTMLParser>.fromOpaque(context!).takeUnretainedValue()
+			
 			parser.currentContinuation?.yield(.startDocument)
 		}
 
 		handler.endDocument = { context in
 			let parser = Unmanaged<HTMLParser>.fromOpaque(context!).takeUnretainedValue()
+			
 			parser.currentContinuation?.yield(.endDocument)
 		}
 
 		handler.startElement = { context, name, atts in
 			let parser = Unmanaged<HTMLParser>.fromOpaque(context!).takeUnretainedValue()
-			parser.resetAccumulateBufferAndReportCharacters()
 			let elementName = String(cString: name!)
+			
 			var attributes = [String: String]()
 			var i = 0
 			while let att = atts?[i] {
@@ -195,30 +190,40 @@ public final class HTMLParser
 				}
 				i += 1
 			}
+			
+			parser.resetAccumulateBufferAndReportCharacters()
 			parser.currentContinuation?.yield(.startElement(name: elementName, attributes: attributes))
 		}
 
 		handler.endElement = { context, name in
 			let parser = Unmanaged<HTMLParser>.fromOpaque(context!).takeUnretainedValue()
-			parser.resetAccumulateBufferAndReportCharacters()
 			let elementName = String(cString: name!)
+			
+			parser.resetAccumulateBufferAndReportCharacters()
 			parser.currentContinuation?.yield(.endElement(name: elementName))
 		}
 
 		handler.characters = { context, chars, len in
 			let parser = Unmanaged<HTMLParser>.fromOpaque(context!).takeUnretainedValue()
-			parser.accumulateCharacters(chars, length: len)
+			
+			guard let chars,
+				  let characters = String(bytesNoCopy: UnsafeMutableRawPointer(mutating: chars), length: Int(len), encoding: .utf8, freeWhenDone: false)
+			else { return }
+			
+			parser.accumulateCharacters(characters)
 		}
 
 		handler.comment = { context, chars in
 			let parser = Unmanaged<HTMLParser>.fromOpaque(context!).takeUnretainedValue()
 			let comment = String(cString: chars!)
+			
 			parser.currentContinuation?.yield(.comment(comment))
 		}
 
 		handler.cdataBlock = { context, value, len in
 			let parser = Unmanaged<HTMLParser>.fromOpaque(context!).takeUnretainedValue()
 			let data = Data(bytes: value!, count: Int(len))
+			
 			parser.currentContinuation?.yield(.cdata(data))
 		}
 
@@ -226,6 +231,7 @@ public final class HTMLParser
 			let parser = Unmanaged<HTMLParser>.fromOpaque(context!).takeUnretainedValue()
 			let targetString = String(cString: target!)
 			let dataString = String(cString: data!)
+
 			parser.currentContinuation?.yield(.processingInstruction(target: targetString, data: dataString))
 		}
 	}
@@ -248,6 +254,14 @@ public final class HTMLParser
 			}
 		}
 	}
+	
+	private func accumulateCharacters(_ string: String) {
+		if accumulateBuffer == nil {
+			accumulateBuffer = string
+		} else {
+			accumulateBuffer?.append(string)
+		}
+	}
 
 	// Function to handle the formatted error message
 	func handleError(_ errorMessage: String)
@@ -256,7 +270,7 @@ public final class HTMLParser
 		self.parserError = error // Always record the error
 		
 		// If we have a continuation and we're not in recovery mode, *always* finish with error
-		if let continuation = currentContinuation, !shouldRecover {
+		if let continuation = currentContinuation, !options.contains(.recover) {
 			continuation.finish(throwing: error)
 			currentContinuation = nil // Mark as finished
 		}
@@ -266,14 +280,14 @@ public final class HTMLParser
 // Extern declaration to be called from C code
 @_cdecl("swift_error_handler")
 func swift_error_handler(_ ctx: UnsafeMutableRawPointer?, _ msg: UnsafePointer<CChar>?) {
-	guard let context = ctx, 
+	guard let context = ctx,
 			let message = msg else
 	{
 		return
 	}
-	
+
 	let parser = Unmanaged<HTMLParser>.fromOpaque(context).takeUnretainedValue()
-	
 	let errorMessage = String(cString: message)
+
 	parser.handleError(errorMessage)
 }

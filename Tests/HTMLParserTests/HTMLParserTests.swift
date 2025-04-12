@@ -41,7 +41,7 @@ struct HTMLParserTests {
 		var events: [HTMLParsingEvent] = []
 		
 		// Parse and collect events
-		for try await event in parser.parse() {
+		for try await event in await parser.parse() {
 			events.append(event)
 		}
 		
@@ -134,11 +134,11 @@ struct HTMLParserTests {
 		let htmlData = Data(invalidHTML.utf8)
 		
 		// Create parser, disabling recovery to make it throw errors
-		let parser = HTMLParser(data: htmlData, encoding: .utf8, shouldRecover: false)
+		let parser = HTMLParser(data: htmlData, encoding: .utf8, options: [.noNet])  // no .recover so that we get error
 		
 		// Try to parse and expect an error
 		do {
-			for try await _ in parser.parse() {
+			for try await _ in await parser.parse() {
 				// Should not reach here
 			}
 			#expect(Bool(false), "Expected an error to be thrown")
@@ -169,9 +169,9 @@ struct HTMLParserTests {
 		
 		// Start parsing in a task
 		do {
-			for try await _ in parser.parse() {
+			for try await _ in await parser.parse() {
 				// Abort parsing after the first event
-				parser.abortParsing()
+				await parser.abortParsing()
 				break
 			}
 		} catch {
@@ -181,10 +181,10 @@ struct HTMLParserTests {
 		
 		
 		// Verify the parser was aborted
-		#expect(parser.error is HTMLParserError, "Error should be of type HTMLParserError")
+		#expect(await parser.error is HTMLParserError, "Error should be of type HTMLParserError")
 		
 		// Check if the error is the aborted case without using Equatable
-		if let parserError = parser.error as? HTMLParserError {
+		if let parserError = await parser.error as? HTMLParserError {
 			switch parserError {
 				case .aborted:
 					// This is the expected case

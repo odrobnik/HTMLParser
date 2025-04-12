@@ -1,7 +1,7 @@
 import Foundation
 
 /// Represents events that can occur during HTML parsing.
-public enum HTMLParsingEvent: Equatable {
+public enum HTMLParsingEvent: Equatable, Sendable {
     /// Called when the parser begins parsing the document.
     case startDocument
     
