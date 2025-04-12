@@ -7,7 +7,10 @@ let package = Package(
 	name: "HTMLParser",
 	platforms: [
 		.macOS(.v10_15),
-		.iOS(.v13)
+		.iOS(.v13),
+		.tvOS(.v13),
+		.watchOS(.v6),
+		.visionOS(.v1)
 	],
 	products: [
 		.library(name: "HTMLParser", targets: ["HTMLParser"]),

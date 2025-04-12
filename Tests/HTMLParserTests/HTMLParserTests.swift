@@ -174,7 +174,7 @@ struct HTMLParserTests {
 		
 		
 		// Verify the parser was aborted
-		#expect(await parser.error is HTMLParserError, "Error should be of type HTMLParserError")
+		#expect(parser.error is HTMLParserError, "Error should be of type HTMLParserError")
 		
 		// Check if the error is the aborted case without using Equatable
 		if let parserError = parser.error as? HTMLParserError {
