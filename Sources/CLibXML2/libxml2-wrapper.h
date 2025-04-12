@@ -10,6 +10,7 @@
 
 #include <libxml/parser.h>
 #include <libxml/tree.h>
+#include <libxml/encoding.h>
 #include <libxml/entities.h>
 #include <libxml/SAX2.h>
 #include <libxml/HTMLparser.h>
