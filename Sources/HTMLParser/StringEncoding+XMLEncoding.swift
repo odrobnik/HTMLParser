@@ -1,11 +1,9 @@
 import Foundation
 
+import CHTMLParser
+
 #if canImport(ClibXML2)
 import CLibXML2
-#endif
-
-#if canImport(libxml2)
-import libxml2
 #endif
 
 /// Extension to convert Swift String.Encoding to libxml2's xmlCharEncoding
