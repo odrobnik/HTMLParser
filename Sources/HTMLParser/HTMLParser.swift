@@ -21,7 +21,7 @@ public final class HTMLParser
 	
 	// Parser State
 	
-	private var parserContext: htmlParserCtxtPtr?
+	internal var parserContext: htmlParserCtxtPtr?
 	private var handler: htmlSAXHandler
 	private var accumulateBuffer: String?
 	private var parserError: HTMLParserError?
