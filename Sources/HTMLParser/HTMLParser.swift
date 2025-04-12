@@ -8,6 +8,9 @@ import CLibXML2
 import libxml2
 #endif
 
+/**
+ A Swift wrapper around libxml2's HTML parser that provides a streaming interface for parsing HTML documents.
+ */
 public final class HTMLParser
 {
 	// Input
@@ -27,6 +30,14 @@ public final class HTMLParser
 	
 	// MARK: - Init / Deinit
 	
+	/**
+	 Creates a new HTML parser instance.
+	 
+	 - Parameters:
+	   - data: The HTML data to parse
+	   - encoding: The character encoding of the HTML data (defaults to UTF-8)
+	   - options: Parser options to control parsing behavior
+	 */
 	public init(data: Data, encoding: String.Encoding = .utf8, options: HTMLParserOptions = [.noNet, .noBlanks, .recover])
 	{
 		self.data = data
@@ -47,30 +58,50 @@ public final class HTMLParser
 	
 	// MARK: - Public Methods
 	
+	/**
+	 The current line number being parsed.
+	 */
 	public var lineNumber: Int {
 		return Int(xmlSAX2GetLineNumber(parserContext))
 	}
 
+	/**
+	 The current column number being parsed.
+	 */
 	public var columnNumber: Int {
 		return Int(xmlSAX2GetColumnNumber(parserContext))
 	}
 
+	/**
+	 The system ID of the document being parsed.
+	 */
 	public var systemID: String? {
 		guard let systemID = xmlSAX2GetSystemId(parserContext) else { return nil }
 		return String(cString: systemID)
 	}
 
+	/**
+	 The public ID of the document being parsed.
+	 */
 	public var publicID: String? {
 		guard let publicID = xmlSAX2GetPublicId(parserContext) else { return nil }
 		return String(cString: publicID)
 	}
 
+	/**
+	 The current parsing error, if any.
+	 */
 	public var error: Error? {
 		return parserError
 	}
 	
 	// MARK: - AsyncThrowingStream API
 	
+	/**
+	 Parses the HTML document and returns a stream of parsing events.
+	 
+	 - Returns: An async stream that yields HTML parsing events
+	 */
 	public func parse() -> AsyncThrowingStream<HTMLParsingEvent, Error> {
 		return AsyncThrowingStream { continuation in
 			// Store the continuation
@@ -120,6 +151,9 @@ public final class HTMLParser
 		}
 	}
 
+	/**
+	 Aborts the current parsing operation.
+	 */
 	public func abortParsing()
 	{
 		if parserContext != nil {
@@ -148,6 +182,9 @@ public final class HTMLParser
 	
 	// MARK: - Helpers
 	
+	/**
+	 Configures the SAX handler callbacks for the parser.
+	 */
 	private func configureHandlersForStream() {
 		handler.startDocument = { context in
 			let parser = Unmanaged<HTMLParser>.fromOpaque(context!).takeUnretainedValue()
@@ -191,12 +228,7 @@ public final class HTMLParser
 
 		handler.characters = { context, chars, len in
 			let parser = Unmanaged<HTMLParser>.fromOpaque(context!).takeUnretainedValue()
-			
-			guard let chars,
-				  let characters = String(bytesNoCopy: UnsafeMutableRawPointer(mutating: chars), length: Int(len), encoding: .utf8, freeWhenDone: false)
-			else { return }
-			
-			parser.accumulateCharacters(characters)
+			parser.accumulateCharacters(chars, length: len)
 		}
 
 		handler.comment = { context, chars in
@@ -215,6 +247,9 @@ public final class HTMLParser
 		}
 	}
 
+	/**
+	 Resets the character accumulation buffer and reports any accumulated characters.
+	 */
 	private func resetAccumulateBufferAndReportCharacters() {
 		if let buffer = accumulateBuffer, !buffer.isEmpty {
 			currentContinuation?.yield(.characters(buffer))
@@ -222,6 +257,11 @@ public final class HTMLParser
 		}
 	}
 
+	/**
+	 Accumulates characters from the parser.
+	 
+	 - Parameter characters: The characters to accumulate
+	 */
 	private func accumulateCharacters(_ characters: UnsafePointer<xmlChar>?, length: Int32) {
 		guard let characters = characters else { return }
 		let str = String(bytesNoCopy: UnsafeMutableRawPointer(mutating: characters), length: Int(length), encoding: .utf8, freeWhenDone: false)
@@ -234,15 +274,11 @@ public final class HTMLParser
 		}
 	}
 	
-	private func accumulateCharacters(_ string: String) {
-		if accumulateBuffer == nil {
-			accumulateBuffer = string
-		} else {
-			accumulateBuffer?.append(string)
-		}
-	}
-
-	// Function to handle the formatted error message
+	/**
+	 Handles parser errors.
+	 
+	 - Parameter errorMessage: The error message from the parser
+	 */
 	func handleError(_ errorMessage: String)
 	{
 		let error = HTMLParserError.parsingError(message: errorMessage)
