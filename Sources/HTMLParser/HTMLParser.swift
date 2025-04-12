@@ -4,8 +4,6 @@ import CHTMLParser
 
 #if canImport(ClibXML2)
 import CLibXML2
-#else
-import libxml2
 #endif
 
 /**

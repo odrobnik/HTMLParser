@@ -2,7 +2,9 @@ import Foundation
 
 #if canImport(ClibXML2)
 import CLibXML2
-#else
+#endif
+
+#if canImport(libxml2)
 import libxml2
 #endif
 

@@ -7,12 +7,6 @@
 
 import Foundation
 
-#if canImport(libxml2)
-import libxml2
-#else
-import CLibXML2
-#endif
-
 /// Wrapper for libxml2 htmlParserOption enum
 /// See: http://xmlsoft.org/html/libxml-HTMLparser.html#htmlParserOption
 public struct HTMLParserOptions: OptionSet, Sendable {
