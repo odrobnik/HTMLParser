@@ -1,6 +1,6 @@
 import Foundation
-//import Testing
 @testable import HTMLParser
+
 import Testing
 
 @Suite("HTMLParser Tests")
@@ -189,5 +189,113 @@ struct HTMLParserTests {
 			#expect(Bool(false), "Error should be of type HTMLParserError")
 		}
 	}
+	
+	@Test("DTHTMLParser Delegate Pattern")
+	func testDTHTMLParserDelegate() throws {
+		#if !os(Linux)
+		// Create a simple HTML document
+		let htmlString = """
+		<!DOCTYPE html>
+		<html>
+			<head>
+				<title>Test Page</title>
+				<!-- This is a comment -->
+			</head>
+			<body>
+				<h1>Hello World</h1>
+				<p>This is a <b>test</b> paragraph.</p>
+			</body>
+		</html>
+		"""
+		
+		// Convert to Data
+		let htmlData = Data(htmlString.utf8)
+		
+		// Create a delegate to collect events
+		class TestDelegate: NSObject, DTHTMLParserDelegate {
+			var events: [(String, Any)] = []
+			
+			func parserDidStartDocument(_ parser: DTHTMLParser) {
+				events.append(("startDocument", ""))
+			}
+			
+			func parserDidEndDocument(_ parser: DTHTMLParser) {
+				events.append(("endDocument", ""))
+			}
+			
+			func parser(_ parser: DTHTMLParser, didStartElement elementName: String, attributes attributeDict: [String : String]) {
+				events.append(("startElement", (elementName, attributeDict)))
+			}
+			
+			func parser(_ parser: DTHTMLParser, didEndElement elementName: String) {
+				events.append(("endElement", elementName))
+			}
+			
+			func parser(_ parser: DTHTMLParser, foundCharacters string: String) {
+				// Only add non-whitespace character events
+				if !string.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+					events.append(("characters", string))
+				}
+			}
+			
+			func parser(_ parser: DTHTMLParser, foundComment comment: String) {
+				events.append(("comment", comment))
+			}
+		}
+		
+		// Create parser and delegate
+		let delegate = TestDelegate()
+		let parser = DTHTMLParser(data: htmlData, encoding: .utf8)
+		parser.delegate = delegate
+		
+		// Parse the document
+		parser.parse()
+		
+		// Verify events
+		#expect(delegate.events.count > 0, "Should have parsed at least one event")
+		
+		// Expected events in order
+		let expectedEvents: [(String, Any)] = [
+			("startDocument", ""),
+			("startElement", ("html", [:])),
+			("startElement", ("head", [:])),
+			("startElement", ("title", [:])),
+			("characters", "Test Page"),
+			("endElement", "title"),
+			("comment", " This is a comment "),
+			("endElement", "head"),
+			("startElement", ("body", [:])),
+			("startElement", ("h1", [:])),
+			("characters", "Hello World"),
+			("endElement", "h1"),
+			("startElement", ("p", [:])),
+			("characters", "This is a "),
+			("startElement", ("b", [:])),
+			("characters", "test"),
+			("endElement", "b"),
+			("characters", " paragraph."),
+			("endElement", "p"),
+			("endElement", "body"),
+			("endElement", "html"),
+			("endDocument", "")
+		]
+		
+		// Verify event count
+		#expect(delegate.events.count == expectedEvents.count, "Should have the correct number of events")
+		
+		// Verify each event
+		for (index, (expectedType, expectedValue)) in expectedEvents.enumerated() {
+			let (actualType, actualValue) = delegate.events[index]
+			#expect(actualType == expectedType, "Event type mismatch at index \(index)")
+			
+			if let expectedTuple = expectedValue as? (String, [String: String]),
+			   let actualTuple = actualValue as? (String, [String: String]) {
+				#expect(actualTuple.0 == expectedTuple.0, "Element name mismatch at index \(index)")
+				#expect(actualTuple.1 == expectedTuple.1, "Attributes mismatch at index \(index)")
+			} else {
+				#expect(String(describing: actualValue) == String(describing: expectedValue), "Value mismatch at index \(index)")
+			}
+		}
+		#endif
+	}
 }
-
