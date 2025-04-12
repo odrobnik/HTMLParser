@@ -11,7 +11,7 @@ import Foundation
 @objc(DTHTMLParser)
 public final class DTHTMLParser: NSObject, @unchecked Sendable
 {
-	public weak var delegate: HTMLParserDelegate?
+	public weak var delegate: DTHTMLParserDelegate?
 	
 	// Parser properties
 	private var data: Data
