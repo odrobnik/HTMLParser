@@ -41,7 +41,7 @@ struct HTMLParserTests {
 		var events: [HTMLParsingEvent] = []
 		
 		// Parse and collect events
-		for try await event in await parser.parse() {
+		for try await event in parser.parse() {
 			events.append(event)
 		}
 		
@@ -114,13 +114,6 @@ struct HTMLParserTests {
 			return false
 		}, "Should have a characters event for 'test'")
 		
-		/* // Removing CDATA check as it seems unreliable with HTML parser options
-		 #expect(events.contains { 
-		 if case .cdata(let data) = $0, String(data: data, encoding: .utf8) == "This is CDATA content" { return true }
-		 return false
-		 }, "Should have a cdata event")
-		 */
-		
 		#expect(events.contains { 
 			if case .processingInstruction(let target, let data) = $0, target == "xml-stylesheet" && data.contains("type=\"text/css\"") { return true }
 			return false
@@ -138,7 +131,7 @@ struct HTMLParserTests {
 		
 		// Try to parse and expect an error
 		do {
-			for try await _ in await parser.parse() {
+			for try await _ in parser.parse() {
 				// Should not reach here
 			}
 			#expect(Bool(false), "Expected an error to be thrown")
@@ -169,9 +162,9 @@ struct HTMLParserTests {
 		
 		// Start parsing in a task
 		do {
-			for try await _ in await parser.parse() {
+			for try await _ in parser.parse() {
 				// Abort parsing after the first event
-				await parser.abortParsing()
+				parser.abortParsing()
 				break
 			}
 		} catch {
@@ -184,7 +177,7 @@ struct HTMLParserTests {
 		#expect(await parser.error is HTMLParserError, "Error should be of type HTMLParserError")
 		
 		// Check if the error is the aborted case without using Equatable
-		if let parserError = await parser.error as? HTMLParserError {
+		if let parserError = parser.error as? HTMLParserError {
 			switch parserError {
 				case .aborted:
 					// This is the expected case

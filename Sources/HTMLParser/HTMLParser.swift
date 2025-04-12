@@ -80,57 +80,43 @@ public final class HTMLParser
 			configureHandlersForStream()
 			
 			// Set up the parser
+			let bytes = (data as NSData).bytes.assumingMemoryBound(to: Int8.self)
 			let dataSize = data.count
 			
 			// Use the extension to convert Swift encoding to libxml2 encoding
 			let charEnc = encoding.xmlCharEncoding
 			
-			parserContext = htmlCreatePushParserCtxt(&handler, Unmanaged.passUnretained(self).toOpaque(), nil, 0, nil, charEnc)
+			parserContext = htmlCreatePushParserCtxt(&handler, Unmanaged.passUnretained(self).toOpaque(), bytes, Int32(dataSize), nil, charEnc)
 			
 			htmlCtxtUseOptions(parserContext, options.rawValue)
 			
-			// Push the data in chunks to allow for error handling
-			let chunkSize = 4096
-			var offset = 0
-			
-			while offset < dataSize {
-				let remainingSize = dataSize - offset
-				let currentChunkSize = min(chunkSize, remainingSize)
-				
-				let chunk = data.subdata(in: offset..<(offset + currentChunkSize))
-				_ = htmlParseChunk(parserContext, (chunk as NSData).bytes.assumingMemoryBound(to: Int8.self), Int32(currentChunkSize), 0)
-				
-				// Only check for abort here. Errors are handled by handleError when !shouldRecover
-				if isAborting {
-					// handleError or abortParsing should have already finished the continuation
-					return
-				}
-				
-				offset += currentChunkSize
-			}
-			
-			// Complete the parsing
-			_ = htmlParseChunk(parserContext, nil, 0, 1)
-			
-			// Only check for abort here. Errors are handled by handleError when !shouldRecover
-			if isAborting {
-				// handleError or abortParsing should have already finished the continuation
-				return
-			}
-			
-			// If we haven't finished due to error or abort, finish normally
-			if currentContinuation != nil {
-				continuation.finish()
-			}
-			
+			let result = htmlParseDocument(parserContext)
+
 			// Clean up
 			if let context = parserContext {
 				htmlFreeParserCtxt(context)
 				parserContext = nil
 			}
 			
-			// Reset the continuation
-			self.currentContinuation = nil
+			// If we haven't finished due to error or abort, finish normally
+			if currentContinuation != nil {
+				
+				if result == 0 || options.contains(.recover) || isAborting
+				{
+					continuation.finish()
+				}
+				else if let error = self.parserError
+				{
+					continuation.finish(throwing: error)
+				}
+				else
+				{
+					continuation.finish(throwing: HTMLParserError.unknown)
+				}
+				
+				// Reset the continuation
+				self.currentContinuation = nil
+			}
 		}
 	}
 
@@ -218,13 +204,6 @@ public final class HTMLParser
 			let comment = String(cString: chars!)
 			
 			parser.currentContinuation?.yield(.comment(comment))
-		}
-
-		handler.cdataBlock = { context, value, len in
-			let parser = Unmanaged<HTMLParser>.fromOpaque(context!).takeUnretainedValue()
-			let data = Data(bytes: value!, count: Int(len))
-			
-			parser.currentContinuation?.yield(.cdata(data))
 		}
 
 		handler.processingInstruction = { context, target, data in

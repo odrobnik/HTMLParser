@@ -26,10 +26,6 @@ public enum HTMLParsingEvent: Equatable, Sendable {
     /// - Parameter comment: The comment text.
     case comment(String)
     
-    /// Called when the parser encounters a CDATA section.
-    /// - Parameter CDATABlock: The CDATA content as Data.
-    case cdata(Data)
-    
     /// Called when the parser encounters a processing instruction.
     /// - Parameters:
     ///   - target: The target of the processing instruction.
@@ -51,8 +47,6 @@ public enum HTMLParsingEvent: Equatable, Sendable {
             return str1 == str2
         case (.comment(let comment1), .comment(let comment2)):
             return comment1 == comment2
-        case (.cdata(let data1), .cdata(let data2)):
-            return data1 == data2
         case (.processingInstruction(let target1, let data1), .processingInstruction(let target2, let data2)):
             return target1 == target2 && data1 == data2
         default:
