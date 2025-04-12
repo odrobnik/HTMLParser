@@ -262,8 +262,13 @@ public final class HTMLParser
 	 */
 	private func accumulateCharacters(_ characters: UnsafePointer<xmlChar>?, length: Int32) {
 		guard let characters = characters else { return }
-		let str = String(bytesNoCopy: UnsafeMutableRawPointer(mutating: characters), length: Int(length), encoding: .utf8, freeWhenDone: false)
-		if let str = str {
+		
+		// Create a buffer with the correct length
+		let buffer = UnsafeBufferPointer(start: characters, count: Int(length))
+		
+		// Convert to Data and then to String
+		let data = Data(buffer: buffer)
+		if let str = String(data: data, encoding: .utf8) {
 			if accumulateBuffer == nil {
 				accumulateBuffer = str
 			} else {
