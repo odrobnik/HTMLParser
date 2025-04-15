@@ -48,7 +48,12 @@ let package = Package(
 		// Tests
 		.testTarget(
 			name: "HTMLParserTests",
-			dependencies: ["HTMLParser"]
+			dependencies: [
+				"HTMLParser"
+			],
+			resources: [
+				.process("Resources")
+			]
 		)
 	]
 )

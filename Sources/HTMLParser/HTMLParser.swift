@@ -9,13 +9,15 @@ import CLibXML2
 /**
  A Swift wrapper around libxml2's HTML parser that provides a streaming interface for parsing HTML documents.
  */
-public final class HTMLParser
+public final class HTMLParser: @unchecked Sendable
 {
 	// Input
 	
-	private let data: Data
+	private let data: Data?
+	private let url: URL?
 	private let encoding: String.Encoding
 	private let options: HTMLParserOptions
+	private let session: URLSession
 	
 	// Parser State
 	
@@ -29,7 +31,7 @@ public final class HTMLParser
 	// MARK: - Init / Deinit
 	
 	/**
-	 Creates a new HTML parser instance.
+	 Creates a new HTML parser instance with data.
 	 
 	 - Parameters:
 	   - data: The HTML data to parse
@@ -39,8 +41,32 @@ public final class HTMLParser
 	public init(data: Data, encoding: String.Encoding = .utf8, options: HTMLParserOptions = [.noNet, .noBlanks, .recover])
 	{
 		self.data = data
+		self.url = nil
 		self.encoding = encoding
 		self.options = options
+		self.session = .shared
+		self.handler = htmlSAXHandler()
+		
+		// Set up the error handler
+		htmlparser_set_error_handler(&handler)
+	}
+	
+	/**
+	 Creates a new HTML parser instance with a URL.
+	 
+	 - Parameters:
+	   - url: The URL to load HTML data from
+	   - encoding: The character encoding of the HTML data (defaults to UTF-8)
+	   - options: Parser options to control parsing behavior
+	   - session: The URL session to use for loading data (defaults to .shared)
+	 */
+	public init(url: URL, encoding: String.Encoding = .utf8, options: HTMLParserOptions = [.noNet, .noBlanks, .recover], session: URLSession = .shared)
+	{
+		self.data = nil
+		self.url = url
+		self.encoding = encoding
+		self.options = options
+		self.session = session
 		self.handler = htmlSAXHandler()
 		
 		// Set up the error handler
@@ -109,42 +135,100 @@ public final class HTMLParser
 			configureHandlersForStream()
 			
 			// Set up the parser
-			let bytes = (data as NSData).bytes.assumingMemoryBound(to: Int8.self)
-			let dataSize = data.count
-			
-			// Use the extension to convert Swift encoding to libxml2 encoding
 			let charEnc = encoding.xmlCharEncoding
 			
-			parserContext = htmlCreatePushParserCtxt(&handler, Unmanaged.passUnretained(self).toOpaque(), bytes, Int32(dataSize), nil, charEnc)
+			// Create a push parser context
+			parserContext = htmlCreatePushParserCtxt(&handler, Unmanaged.passUnretained(self).toOpaque(), nil, 0, nil, charEnc)
 			
 			htmlCtxtUseOptions(parserContext, options.rawValue)
 			
-			let result = htmlParseDocument(parserContext)
-
-			// Clean up
-			if let context = parserContext {
-				htmlFreeParserCtxt(context)
-				parserContext = nil
-			}
-			
-			// If we haven't finished due to error or abort, finish normally
-			if currentContinuation != nil {
-				
-				if result == 0 || options.contains(.recover) || isAborting
-				{
+			// Create a task to handle the async work
+			Task { @Sendable in
+				do {
+					// If we have data, parse it directly
+					if let data = self.data {
+						let bytes = (data as NSData).bytes.assumingMemoryBound(to: Int8.self)
+						let dataSize = data.count
+						
+						// Feed the data to the parser
+						htmlParseChunk(parserContext, bytes, Int32(dataSize), 0)
+						
+						// Check for errors
+						if let error = self.parserError {
+							throw error
+						}
+					}
+					
+					// If we have a URL, handle it based on the scheme
+					else if let url = self.url {
+						if url.isFileURL {
+							// For file URLs, read the file in chunks
+							let fileHandle = try FileHandle(forReadingFrom: url)
+							defer { try? fileHandle.close() }
+							
+							// Read the file in chunks
+							while true {
+								let chunk = fileHandle.readData(ofLength: 8192) // 8KB chunks
+								guard !chunk.isEmpty else { break }
+								
+								// Convert chunk to bytes
+								let bytes = (chunk as NSData).bytes.assumingMemoryBound(to: Int8.self)
+								let dataSize = chunk.count
+								
+								// Feed the chunk to the parser
+								htmlParseChunk(parserContext, bytes, Int32(dataSize), 0)
+								
+								// Check for errors
+								if let error = self.parserError {
+									throw error
+								}
+							}
+						} else {
+							// For network URLs, use ChunkLoader
+							let loader = ChunkLoader(url: url, session: session)
+							
+							// Load chunks and feed them to the parser
+							for try await chunk in loader.loadChunks() {
+								// Convert chunk to bytes
+								let bytes = (chunk as NSData).bytes.assumingMemoryBound(to: Int8.self)
+								let dataSize = chunk.count
+								
+								// Feed the chunk to the parser
+								htmlParseChunk(parserContext, bytes, Int32(dataSize), 0)
+								
+								// Check for errors
+								if let error = self.parserError {
+									throw error
+								}
+							}
+						}
+					}
+					
+					// Finish parsing
+					htmlParseChunk(parserContext, nil, 0, 1)
+					
+					// Check for errors
+					if let error = self.parserError {
+						throw error
+					}
+					
+					// Finish the stream
 					continuation.finish()
-				}
-				else if let error = self.parserError
-				{
+				} catch {
+					// Handle errors
 					continuation.finish(throwing: error)
 				}
-				else
-				{
-					continuation.finish(throwing: HTMLParserError.unknown)
-				}
 				
-				// Reset the continuation
-				self.currentContinuation = nil
+				// Clean up
+				if let context = parserContext {
+					htmlFreeParserCtxt(context)
+					parserContext = nil
+				}
+			}
+			
+			// Set up cancellation
+			continuation.onTermination = { @Sendable _ in
+				self.abortParsing()
 			}
 		}
 	}

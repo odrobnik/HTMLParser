@@ -35,7 +35,7 @@ struct HTMLParserTests {
 		let htmlData = Data(htmlString.utf8)
 		
 		// Create parser
-		let parser = HTMLParser(data: htmlData, encoding: .utf8)
+		let parser = HTMLParser(data: htmlData, encoding: .utf8, options: [.noError, .recover])
 		
 		// Collect events
 		var events: [HTMLParsingEvent] = []
@@ -297,5 +297,23 @@ struct HTMLParserTests {
 			}
 		}
 		#endif
+	}
+	
+	@Test("Load from URL")
+	func testParseSwiftMailArticle() async throws {
+		// Get the path to the SwiftMail HTML file in Resources
+		
+		let url = Bundle.module.url(forResource: "swiftmail", withExtension: "html")!
+		
+		// Create parser with the local file
+		let parser = HTMLParser(url: url, options: [.recover, .noError, .noBlanks, .noNet, .compact])
+		
+		// Collect all events into an array
+		var events: [HTMLParsingEvent] = []
+		for try await event in parser.parse() {
+			events.append(event)
+		}
+		
+		#expect(events.count >= 1275)
 	}
 }
