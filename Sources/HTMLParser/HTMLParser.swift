@@ -15,6 +15,7 @@ public final class HTMLParser: @unchecked Sendable
 	
 	private let data: Data?
 	private let url: URL?
+	private let request: URLRequest?
 	private let encoding: String.Encoding
 	private let options: HTMLParserOptions
 	private let session: URLSession
@@ -42,9 +43,33 @@ public final class HTMLParser: @unchecked Sendable
 	{
 		self.data = data
 		self.url = nil
+		self.request = nil
 		self.encoding = encoding
 		self.options = options
 		self.session = .shared
+		self.handler = htmlSAXHandler()
+		
+		// Set up the error handler
+		htmlparser_set_error_handler(&handler)
+	}
+	
+	/**
+	 Creates a new HTML parser instance with a URL request.
+	 
+	 - Parameters:
+	   - request: The URL request to load HTML data from
+	   - encoding: The character encoding of the HTML data (defaults to UTF-8)
+	   - options: Parser options to control parsing behavior
+	   - session: The URL session to use for loading data (defaults to .shared)
+	 */
+	public init(request: URLRequest, encoding: String.Encoding = .utf8, options: HTMLParserOptions = [.noNet, .noBlanks, .recover], session: URLSession = .shared)
+	{
+		self.data = nil
+		self.url = request.url
+		self.request = request
+		self.encoding = encoding
+		self.options = options
+		self.session = session
 		self.handler = htmlSAXHandler()
 		
 		// Set up the error handler
@@ -60,17 +85,9 @@ public final class HTMLParser: @unchecked Sendable
 	   - options: Parser options to control parsing behavior
 	   - session: The URL session to use for loading data (defaults to .shared)
 	 */
-	public init(url: URL, encoding: String.Encoding = .utf8, options: HTMLParserOptions = [.noNet, .noBlanks, .recover], session: URLSession = .shared)
+	public convenience init(url: URL, encoding: String.Encoding = .utf8, options: HTMLParserOptions = [.noNet, .noBlanks, .recover], session: URLSession = .shared)
 	{
-		self.data = nil
-		self.url = url
-		self.encoding = encoding
-		self.options = options
-		self.session = session
-		self.handler = htmlSAXHandler()
-		
-		// Set up the error handler
-		htmlparser_set_error_handler(&handler)
+		self.init(request: URLRequest(url: url), encoding: encoding, options: options, session: session)
 	}
 
 	deinit {
@@ -185,7 +202,10 @@ public final class HTMLParser: @unchecked Sendable
 							}
 						} else {
 							// For network URLs, use ChunkLoader
-							let loader = ChunkLoader(url: url, session: session)
+							guard let request = self.request else {
+								throw HTMLParserError.parsingError(message: "No request available for network URL")
+							}
+							let loader = ChunkLoader(request: request, session: session)
 							
 							// Load chunks and feed them to the parser
 							for try await chunk in loader.loadChunks() {

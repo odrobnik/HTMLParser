@@ -15,21 +15,21 @@ struct HTMLParserTests {
 	func testBasicHTMLParsing() async throws {
 		// Create a simple HTML document
 		let htmlString = """
-		<!DOCTYPE html>
-		<html>
-		<head>
-			<title>Test Page</title>
-			<!-- This is a comment -->
-			<meta charset="utf-8">
-		</head>
-		<body>
-			<h1>Hello, World!</h1>
-			<p>This is a <b>test</b> paragraph.</p>
-			<![CDATA[This is CDATA content]]>
-			<?xml-stylesheet type="text/css" href="style.css"?>
-		</body>
-		</html>
-		"""
+  <!DOCTYPE html>
+  <html>
+  <head>
+   <title>Test Page</title>
+   <!-- This is a comment -->
+   <meta charset="utf-8">
+  </head>
+  <body>
+   <h1>Hello, World!</h1>
+   <p>This is a <b>test</b> paragraph.</p>
+   <![CDATA[This is CDATA content]]>
+   <?xml-stylesheet type="text/css" href="style.css"?>
+  </body>
+  </html>
+  """
 		
 		// Convert to Data
 		let htmlData = Data(htmlString.utf8)
@@ -49,72 +49,72 @@ struct HTMLParserTests {
 		#expect(events.count > 0, "Should have parsed at least one event")
 		
 		// Check for specific events
-		#expect(events.contains { 
+		#expect(events.contains {
 			if case .startDocument = $0 { return true }
 			return false
 		}, "Should have a startDocument event")
 		
-		#expect(events.contains { 
+		#expect(events.contains {
 			if case .endDocument = $0 { return true }
 			return false
 		}, "Should have an endDocument event")
 		
-		#expect(events.contains { 
+		#expect(events.contains {
 			if case .startElement(let name, _) = $0, name == "html" { return true }
 			return false
 		}, "Should have a startElement event for html")
 		
-		#expect(events.contains { 
+		#expect(events.contains {
 			if case .startElement(let name, _) = $0, name == "head" { return true }
 			return false
 		}, "Should have a startElement event for head")
 		
-		#expect(events.contains { 
+		#expect(events.contains {
 			if case .startElement(let name, _) = $0, name == "title" { return true }
 			return false
 		}, "Should have a startElement event for title")
 		
-		#expect(events.contains { 
+		#expect(events.contains {
 			if case .characters(let text) = $0, text == "Test Page" { return true }
 			return false
 		}, "Should have a characters event for 'Test Page'")
 		
-		#expect(events.contains { 
+		#expect(events.contains {
 			if case .comment(let text) = $0, text == " This is a comment " { return true }
 			return false
 		}, "Should have a comment event")
 		
-		#expect(events.contains { 
+		#expect(events.contains {
 			if case .startElement(let name, _) = $0, name == "body" { return true }
 			return false
 		}, "Should have a startElement event for body")
 		
-		#expect(events.contains { 
+		#expect(events.contains {
 			if case .startElement(let name, _) = $0, name == "h1" { return true }
 			return false
 		}, "Should have a startElement event for h1")
 		
-		#expect(events.contains { 
+		#expect(events.contains {
 			if case .characters(let text) = $0, text == "Hello, World!" { return true }
 			return false
 		}, "Should have a characters event for 'Hello, World!'")
 		
-		#expect(events.contains { 
+		#expect(events.contains {
 			if case .startElement(let name, _) = $0, name == "p" { return true }
 			return false
 		}, "Should have a startElement event for p")
 		
-		#expect(events.contains { 
+		#expect(events.contains {
 			if case .startElement(let name, _) = $0, name == "b" { return true }
 			return false
 		}, "Should have a startElement event for b")
 		
-		#expect(events.contains { 
+		#expect(events.contains {
 			if case .characters(let text) = $0, text == "test" { return true }
 			return false
 		}, "Should have a characters event for 'test'")
 		
-		#expect(events.contains { 
+		#expect(events.contains {
 			if case .processingInstruction(let target, let data) = $0, target == "xml-stylesheet" && data.contains("type=\"text/css\"") { return true }
 			return false
 		}, "Should have a processingInstruction event")
@@ -192,21 +192,21 @@ struct HTMLParserTests {
 	
 	@Test("DTHTMLParser Delegate Pattern")
 	func testDTHTMLParserDelegate() throws {
-		#if !os(Linux)
+#if !os(Linux)
 		// Create a simple HTML document
 		let htmlString = """
-		<!DOCTYPE html>
-		<html>
-			<head>
-				<title>Test Page</title>
-				<!-- This is a comment -->
-			</head>
-			<body>
-				<h1>Hello World</h1>
-				<p>This is a <b>test</b> paragraph.</p>
-			</body>
-		</html>
-		"""
+  <!DOCTYPE html>
+  <html>
+   <head>
+    <title>Test Page</title>
+    <!-- This is a comment -->
+   </head>
+   <body>
+    <h1>Hello World</h1>
+    <p>This is a <b>test</b> paragraph.</p>
+   </body>
+  </html>
+  """
 		
 		// Convert to Data
 		let htmlData = Data(htmlString.utf8)
@@ -296,7 +296,7 @@ struct HTMLParserTests {
 				#expect(String(describing: actualValue) == String(describing: expectedValue), "Value mismatch at index \(index)")
 			}
 		}
-		#endif
+#endif
 	}
 	
 	@Test("Load from URL")

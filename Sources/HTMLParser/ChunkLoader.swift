@@ -1,7 +1,7 @@
 import Foundation
 
 /**
- A utility class that loads data from a URL in chunks.
+ A utility class that loads data from a URL in chunks using an async stream.
  
  This class is useful for processing large files or streaming data without loading
  everything into memory at once. It provides an async stream of data chunks as they
@@ -11,8 +11,8 @@ public final class ChunkLoader: @unchecked Sendable {
     
     // MARK: - Properties
     
-    /// The URL to load data from
-    private let url: URL
+    /// The URL request to load data from
+    private let request: URLRequest
     
     /// The URL session to use for loading data
     private let session: URLSession
@@ -23,12 +23,23 @@ public final class ChunkLoader: @unchecked Sendable {
      Creates a new ChunkLoader instance.
      
      - Parameters:
+       - request: The URL request to load data from
+       - session: The URL session to use for loading data (defaults to .shared)
+     */
+    public init(request: URLRequest, session: URLSession = .shared) {
+        self.request = request
+        self.session = session
+    }
+    
+    /**
+     Creates a new ChunkLoader instance with a URL.
+     
+     - Parameters:
        - url: The URL to load data from
        - session: The URL session to use for loading data (defaults to .shared)
      */
-    public init(url: URL, session: URLSession = .shared) {
-        self.url = url
-        self.session = session
+    public convenience init(url: URL, session: URLSession = .shared) {
+        self.init(request: URLRequest(url: url), session: session)
     }
     
     // MARK: - Public Methods
@@ -66,7 +77,6 @@ public final class ChunkLoader: @unchecked Sendable {
                 func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive response: URLResponse, completionHandler: @escaping (URLSession.ResponseDisposition) -> Void) {
                     // Check for valid response
                     guard let httpResponse = response as? HTTPURLResponse else {
-						
                         continuation.finish(throwing: URLError(.badServerResponse))
                         completionHandler(.cancel)
                         return
@@ -91,7 +101,7 @@ public final class ChunkLoader: @unchecked Sendable {
             let session = URLSession(configuration: .default, delegate: delegate, delegateQueue: nil)
             
             // Create a data task
-            let task = session.dataTask(with: url)
+            let task = session.dataTask(with: request)
             
             // Start the task
             task.resume()
